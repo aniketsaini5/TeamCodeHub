@@ -1,0 +1,31 @@
+<svg viewBox="0 0 1600 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Code Brackets with Connection Nodes -->
+  <g fill="#8200db">
+    <!-- Left Bracket -->
+    <path d="M30,150 L120,50 Q140,30 140,60 L140,100 Q140,115 125,115 Q110,115 110,100 L110,90 Q110,80 100,90 L40,150 L100,210 Q110,220 110,210 L110,200 Q110,185 125,185 Q140,185 140,200 L140,240 Q140,270 120,250 L30,150 Z" />
+    
+    <!-- Right Bracket -->
+    <path d="M470,150 L380,50 Q360,30 360,60 L360,100 Q360,115 375,115 Q390,115 390,100 L390,90 Q390,80 400,90 L460,150 L400,210 Q390,220 390,210 L390,200 Q390,185 375,185 Q360,185 360,200 L360,240 Q360,270 380,250 L470,150 Z" />
+    
+    <!-- Center Node -->
+    <circle cx="250" cy="150" r="40" />
+    
+    <!-- Connecting Nodes -->
+    <circle cx="125" cy="115" r="20" />
+    <circle cx="125" cy="185" r="20" />
+    <circle cx="375" cy="115" r="20" />
+    <circle cx="375" cy="185" r="20" />
+    
+    <!-- Connection Lines -->
+    <line x1="250" y1="150" x2="125" y2="115" stroke="#8200db" stroke-width="15" />
+    <line x1="250" y1="150" x2="125" y2="185" stroke="#8200db" stroke-width="15" />
+    <line x1="250" y1="150" x2="375" y2="115" stroke="#8200db" stroke-width="15" />
+    <line x1="250" y1="150" x2="375" y2="185" stroke="#8200db" stroke-width="15" />
+  </g>
+
+  <!-- Text: TeamCode Hub -->
+  <text x="520" y="200" font-size="150" font-family="Arial" font-weight="bold">
+    <tspan fill="white">TeamCode </tspan>
+    <tspan fill="#8200db">Hub</tspan>
+  </text>
+</svg>
