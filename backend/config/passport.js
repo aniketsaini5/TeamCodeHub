@@ -1,4 +1,3 @@
-// config/passport.js
 const passport = require('passport');
 const GitHubStrategy = require('passport-github2').Strategy;
 const User = require('../models/User');
@@ -7,45 +6,50 @@ module.exports = (app) => {
   passport.use(new GitHubStrategy({
     clientID: process.env.GITHUB_CLIENT_ID,
     clientSecret: process.env.GITHUB_CLIENT_SECRET,
-    callbackURL: `${process.env.SERVER_URL}/auth/github/callback`,
-    scope: ['user:email']
+    callbackURL: process.env.GITHUB_CALLBACK_URL,
+    scope: ['user:email', 'repo']
   }, async (accessToken, refreshToken, profile, done) => {
+    // Log the profile and access token for debugging
+    console.log("GitHub Access Token:", accessToken);
+    console.log("GitHub Callback URL:", process.env.GITHUB_CALLBACK_URL);
+    console.log("GitHub Profile:", profile);
     try {
-      // Extract relevant profile information
+      console.log("GitHub Access Token:", accessToken);
       const githubProfile = {
         githubId: profile.id,
         username: profile.username,
         displayName: profile.displayName || profile.username,
-        email: profile.emails?.[0]?.value,
+        email: profile.emails?.[0]?.value || null, // Handle case where email is not provided,
         avatarUrl: profile.photos?.[0]?.value,
         profileUrl: profile.profileUrl
       };
 
-      // Check for existing user
-      const existingUser = await User.findOne({ githubId: profile.id });
+      let user = await User.findOne({ githubId: profile.id });
 
-      if (existingUser) {
-        // Update last login time
-        existingUser.lastLogin = new Date();
-        await existingUser.save();
-        return done(null, existingUser);
+      if (user) {
+        // Update existing user's access token
+        user.accessToken = accessToken;
+        user.lastLogin = new Date();
+        await user.save();
+        return done(null, user);
       }
 
-      // Create new user if not found
-      const newUser = await User.create({
+      // Create new user
+      user = await User.create({
         ...githubProfile,
+        accessToken,
         createdAt: new Date(),
         lastLogin: new Date()
       });
 
-      return done(null, newUser);
+      return done(null, user);
     } catch (error) {
       console.error('GitHub OAuth Error:', error);
       return done(error, null);
     }
   }));
 
-  // Session serialization
+  // Serialize/deserialize
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
@@ -59,7 +63,4 @@ module.exports = (app) => {
     }
   });
 
-  // Initialize passport
-  app.use(passport.initialize());
-  app.use(passport.session());
 };

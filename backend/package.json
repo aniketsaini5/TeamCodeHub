@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "axios": "^1.9.0",
+    "body-parser": "^2.2.0",
+    "connect-mongo": "^5.1.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -16,7 +18,8 @@
     "express-session": "^1.18.1",
     "mongoose": "^7.8.6",
     "passport": "^0.6.0",
-    "passport-github2": "^0.1.12"
+    "passport-github2": "^0.1.12",
+    "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

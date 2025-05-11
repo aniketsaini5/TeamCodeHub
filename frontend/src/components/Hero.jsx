@@ -5,7 +5,7 @@ const Hero = () => {
     const navigate = useNavigate();
 
     const handleCreateProject = () => {
-        navigate("/create-project");
+        navigate("/Dashboard");
     };
 
     return (
@@ -34,7 +34,7 @@ const Hero = () => {
                             onClick={handleCreateProject}
                             className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-2 md:px-8 md:py-3 rounded-md text-base md:text-lg font-medium transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
                         >
-                            Create Project
+                            Get Started
                         </button>
                     </div>
                 </div>

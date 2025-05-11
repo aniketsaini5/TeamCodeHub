@@ -1,166 +1,118 @@
+// Import required modules
 const express = require('express');
+const mongoose = require('mongoose');
 const cors = require('cors');
-const cookieParser = require('cookie-parser');
-require('dotenv').config();
+const http = require('http');
+const socketIo = require('socket.io');
+const passport = require('passport');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const bodyParser = require('body-parser');
+require('dotenv').config(); // Load environment variables
 
-// Import modules
-const connectDB = require('./config/database');
-const configureSession = require('./config/session');
-const configurePassport = require('./config/passport');
+// Import routes
 const authRoutes = require('./routes/auth');
+const projectRoutes = require('./routes/project');
+const githubRoutes = require('./routes/github');
+const chatRoutes = require('./routes/chat');
 const apiRoutes = require('./routes/api');
-const githubRoutes = require('./routes/githubRoutes');
 
-// Create Express app
+// Initialize Express app
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Connect to MongoDB
-connectDB();
+// Create HTTP server
+const server = http.createServer(app);
 
-// Middleware
-app.use(express.json());
-app.use(cookieParser());
-app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// Configure session
-configureSession(app);
-
-// Configure passport
-configurePassport(app);
-
-// Routes
-app.use('/auth', authRoutes);
-app.use('/api', apiRoutes);
-app.use('/github', githubRoutes); // Use GitHub routes
-
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Initialize Socket.IO with CORS configuration
+const io = socketIo(server, {
+    cors: {
+        origin: process.env.CLIENT_URL || 'http://localhost:5173', // Allow requests from frontend
+        methods: ['GET', 'POST'], // Allowed HTTP methods
+        credentials: true // Allow cookies and credentials
+    }
 });
 
+// Middleware configuration
+app.use(cors({
+    origin: process.env.CLIENT_URL || 'http://localhost:5173', // Allow frontend origin
+    credentials: true // Allow cookies and credentials
+}));
+app.use(bodyParser.json()); // Parse JSON request bodies
+app.use(bodyParser.urlencoded({ extended: true })); // Parse URL-encoded request bodies
 
+// Session configuration
+const sessionMiddleware = session({
+    secret: process.env.SESSION_SECRET || 'TCH_SECRET', // Secret for signing session cookies
+    resave: false, // Do not save session if it hasn't been modified
+    saveUninitialized: false, // Do not save uninitialized sessions
+    store: MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI, // MongoDB connection URI
+        ttl: 14 * 24 * 60 * 60 // Session expiration time (14 days)
+    }),
+    cookie: {
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+        maxAge: 14 * 24 * 60 * 60 * 1000 // Cookie expiration time (14 days)
+    }
+});
 
+// Apply session middleware
+app.use(sessionMiddleware);
+app.use(passport.initialize()); // Initialize Passport.js
+app.use(passport.session()); // Enable session support for Passport.js
 
+// Convert Express middleware to Socket.IO middleware
+const wrap = middleware => (socket, next) => middleware(socket.request, {}, next);
+io.use(wrap(sessionMiddleware)); // Apply session middleware to Socket.IO
+io.use(wrap(passport.initialize())); // Apply Passport.js initialization to Socket.IO
+io.use(wrap(passport.session())); // Apply Passport.js session support to Socket.IO
 
+// Passport configuration
+require('./config/passport')(app);
 
-// require("dotenv").config();
-// const express = require("express");
-// const axios = require("axios");
-// const cors = require("cors");
-// const path = require("path");
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
 
-// const app = express();
+    // Join a project room
+    socket.on('join project', (projectId) => {
+        socket.join(projectId);
+        console.log(`User ${socket.id} joined project: ${projectId}`);
+    });
 
-// // Middleware
-// app.use(express.json());
-// app.use(cors());
-// app.use(express.static(path.join(__dirname, "public")));
+    // Handle chat messages
+    socket.on('chat message', (msg) => {
+        io.to(msg.projectId).emit('chat message', msg); // Broadcast message to project room
+        require('./controllers/chatController').saveMessageSocket(msg); // Save message to database
+    });
 
-// // Environment variables
-// const GITHUB_USERNAME = "Team-Code-Hub";
-// const GITHUB_PAT = "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";
+    // Handle code changes
+    socket.on('code change', (data) => {
+        socket.to(data.projectId).emit('code change', data); // Broadcast code changes to project room
+    });
 
-// // Helper function to create README content
-// const generateReadmeContent = (repoName) => {
-//   return `# ${repoName}\n\nWelcome to ${repoName}! This is a collaborative project created through TeamCodeHub.\n\n## Getting Started\n\n1. Clone the repository\n2. Open in GitHub Codespaces\n3. Start collaborating!\n`;
-// };
+    // Handle cursor position
+    socket.on('cursor position', (data) => {
+        socket.to(data.projectId).emit('cursor position', data); // Broadcast cursor position to project room
+    });
 
-// // Create repository and initialize with README if empty
-// app.post("/create-repo", async (req, res) => {
-//   const { repoName } = req.body;
+    // Handle user disconnection
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+    });
+});
 
-//   if (!repoName) {
-//     return res.status(400).json({ 
-//       success: false, 
-//       message: "Repository name is required" 
-//     });
-//   }
+// Register routes
+app.use('/api/auth', authRoutes); // Authentication routes
+app.use('/api/projects', projectRoutes); // Project-related routes
+app.use('/api/github', githubRoutes); // GitHub-related routes
+app.use('/api/chat', chatRoutes); // Chat-related routes
+app.use('/api', apiRoutes); // General API routes
 
-//   const headers = {
-//     "Authorization": `token ${GITHUB_PAT}`,
-//     "Accept": "application/vnd.github.v3+json"
-//   };
+// MongoDB connection
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('MongoDB connected'))
+    .catch(err => console.log('MongoDB connection error:', err));
 
-//   try {
-//     // Create repository
-//     const createRepoResponse = await axios.post(
-//       "https://api.github.com/user/repos",
-//       {
-//         name: repoName,
-//         private: false,
-//         auto_init: true, // Initialize with README
-//         description: `A collaborative project created with TeamCodeHub`
-//       },
-//       { headers }
-//     );
-
-//     const repoUrl = createRepoResponse.data.html_url;
-//     const codespaceUrl = `https://github.com/codespaces/new?hide_repo_select=true&ref=main&repo=${GITHUB_USERNAME}/${repoName}`;
-
-//     // Check if repo is empty and create README if needed
-//     try {
-//       await axios.get(`https://api.github.com/repos/${GITHUB_USERNAME}/${repoName}/contents`, { headers });
-//     } catch (error) {
-//       if (error.response && error.response.status === 404) {
-//         // Create README.md
-//         await axios.put(
-//           `https://api.github.com/repos/${GITHUB_USERNAME}/${repoName}/contents/README.md`,
-//           {
-//             message: "Initialize repository with README",
-//             content: Buffer.from(generateReadmeContent(repoName)).toString('base64')
-//           },
-//           { headers }
-//         );
-//       }
-//     }
-
-//     res.json({ 
-//       success: true, 
-//       repoUrl, 
-//       codespaceUrl,
-//       message: "Repository created successfully!"
-//     });
-
-//   } catch (error) {
-//     const errorMessage = error.response?.data?.message || error.message;
-//     res.status(500).json({ 
-//       success: false, 
-//       message: `Failed to create repository: ${errorMessage}`
-//     });
-//   }
-// });
-
-// // Check if repository name is available
-// app.get("/check-repo/:name", async (req, res) => {
-//   const repoName = req.params.name;
-
-//   try {
-//     await axios.get(`https://api.github.com/repos/${GITHUB_USERNAME}/${repoName}`, {
-//       headers: {
-//         "Authorization": `token ${GITHUB_PAT}`,
-//         "Accept": "application/vnd.github.v3+json"
-//       }
-//     });
-//     res.json({ available: false });
-//   } catch (error) {
-//     if (error.response && error.response.status === 404) {
-//       res.json({ available: true });
-//     } else {
-//       res.status(500).json({ 
-//         error: "Error checking repository availability" 
-//       });
-//     }
-//   }
-// });
-
-// const PORT = process.env.PORT || 5000;
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-//   console.log(`Access the application at http://localhost:${PORT}`);
-// });
+// Start the server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -1,310 +1,236 @@
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axiosInstance from '../utils/axiosConfig';
+import axios from "../utils/axiosConfig";
 
 const CreateProject = () => {
-    const navigate = useNavigate();
-    const [projectName, setProjectName] = useState("");
-    const [projectDescription, setProjectDescription] = useState("");
-    const [isProjectNameAvailable, setIsProjectNameAvailable] = useState(null);
-    const [teamMembers, setTeamMembers] = useState([
-        { email: "", role: "frontend_dev" }
-    ]);
-    const [isCreating, setIsCreating] = useState(false);
-    const [result, setResult] = useState({ status: "", message: "" });
+  const [projectName, setProjectName] = useState("");
+  const [description, setDescription] = useState("");
+  const [techStack, setTechStack] = useState("");
+  const [members, setMembers] = useState([{ email: "", role: "" }]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-    // Check project name availability with debounce
-    useEffect(() => {
-        if (!projectName.trim()) {
-            setIsProjectNameAvailable(null);
-            return;
-        }
+  const handleMemberChange = (index, field, value) => {
+    const updatedMembers = [...members];
+    updatedMembers[index][field] = value;
+    setMembers(updatedMembers);
+  };
 
-        const timer = setTimeout(async () => {
-            try {
-                const response = await axiosInstance.get(`/github/check-repo/${projectName}`);
-                setIsProjectNameAvailable(response.data.available);
-            } catch (error) {
-                console.error("Error checking repository name:", error);
-                setIsProjectNameAvailable(false);
-            }
-        }, 500);
+  const addMember = () => {
+    setMembers([...members, { email: "", role: "" }]);
+  };
 
-        return () => clearTimeout(timer);
-    }, [projectName]);
+  const removeMember = (index) => {
+    const updatedMembers = members.filter((_, i) => i !== index);
+    setMembers(updatedMembers);
+  };
 
-    const handleAddTeamMember = () => {
-        setTeamMembers([...teamMembers, { email: "", role: "frontend_dev" }]);
-    };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-    const handleRemoveTeamMember = (index) => {
-        const updatedMembers = [...teamMembers];
-        updatedMembers.splice(index, 1);
-        setTeamMembers(updatedMembers);
-    };
+    if (!projectName || !techStack) {
+      setError("Project name and tech stack are required.");
+      return;
+    }
 
-    const handleTeamMemberChange = (index, field, value) => {
-        const updatedMembers = [...teamMembers];
-        updatedMembers[index][field] = value;
-        setTeamMembers(updatedMembers);
-    };
+    setLoading(true);
+    try {
+      const res = await axios.post("/api/projects", {
+        name: projectName,
+        description,
+        techStack,
+        teamMembers: members.filter((m) => m.email && m.role),
+      });
 
-    const handleCreateProject = async (e) => {
-        e.preventDefault();
+      if (res.data.success) {
+        navigate(`/project/${res.data.project._id}`);
+      }
+    } catch (err) {
+      console.error(err);
+      setError(
+        err.response?.data?.message || "Something went wrong. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        if (!projectName.trim()) {
-            setResult({
-                status: "error",
-                message: "Please enter a project name"
-            });
-            return;
-        }
-
-        if (!isProjectNameAvailable) {
-            setResult({
-                status: "error",
-                message: "Project name is already taken. Please choose another name."
-            });
-            return;
-        }
-
-        setIsCreating(true);
-        setResult({ status: "loading", message: "Creating project and setting up environment..." });
-
-        try {
-            // Create GitHub repository
-            const createRepoResponse = await axiosInstance.post("/github/create-repo", {
-                repoName: projectName,
-                description: projectDescription
-            });
-
-            if (!createRepoResponse.data.success) {
-                throw new Error(createRepoResponse.data.message);
-            }
-
-            // Get Codespace URL and repository details
-            const { repoUrl, codespaceUrl } = createRepoResponse.data;
-
-            // Invite team members (would be implemented in a real backend)
-            const invitePromises = teamMembers.map(async (member) => {
-                if (!member.email) return null;
-
-                try {
-                    // This would be a real API call to invite team members
-                    const response = await axiosInstance.post("/invite-team-member", {
-                        projectName,
-                        email: member.email,
-                        role: member.role,
-                        codespaceUrl
-                    });
-                    return response.data;
-                } catch (error) {
-                    console.error(`Failed to invite ${member.email}:`, error);
-                    return { email: member.email, success: false };
-                }
-            });
-
-            await Promise.all(invitePromises);
-
-            setResult({
-                status: "success",
-                message: "Project created successfully! Opening Codespace...",
-                repoUrl,
-                codespaceUrl
-            });
-
-            // Automatically open the Codespace after a short delay
-            setTimeout(() => {
-                window.open(codespaceUrl, "_blank");
-
-                // Navigate to project dashboard in the current window
-                navigate(`/project/${projectName}`);
-            }, 1500);
-
-        } catch (error) {
-            console.error("Error creating project:", error);
-            setResult({
-                status: "error",
-                message: `Failed to create project: ${error.message || "Unknown error"}`
-            });
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-900 text-white">
-            <div className="max-w-4xl mx-auto p-6">
-
-                <h1 className="text-3xl font-bold mb-6 text-center text-purple-800">Create New Project</h1>
-                <form onSubmit={handleCreateProject} className="bg-gray-800 p-6 rounded-lg shadow-md">
-                    {/* Project Details Section */}
-                    <div className="mb-8">
-                        <h2 className="text-xl font-semibold mb-4 border-b border-gray-700 pb-2 text-white">Project Details</h2>
-
-                        <div className="mb-4">
-                            <label htmlFor="projectName" className="block text-sm font-medium mb-1 text-gray-300">
-                                Project Name
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    id="projectName"
-                                    className="w-full p-3 border border-gray-700 rounded-md bg-gray-700 text-white"
-                                    value={projectName}
-                                    onChange={(e) => setProjectName(e.target.value.trim())}
-                                    placeholder="Enter Project Name"
-                                    pattern="[a-zA-Z0-9-_.]+"
-                                    title="Use only letters, numbers, hyphens, underscores, and periods"
-                                    required
-                                />
-                            </div>
-                            {projectName && (
-                                <div className="mt-1 text-sm">
-                                    {isProjectNameAvailable === null ? (
-                                        <span className="text-gray-400">Checking availability...</span>
-                                    ) : isProjectNameAvailable ? (
-                                        <span className="text-green-400">✓ Project name is available</span>
-                                    ) : (
-                                        <span className="text-red-400">✗ Project name is already taken</span>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="mb-4">
-                            <label htmlFor="projectDescription" className="block text-sm font-medium mb-1 text-gray-300">
-                                Project Description
-                            </label>
-                            <textarea
-                                id="projectDescription"
-                                className="w-full p-3 border border-gray-700 rounded-md bg-gray-700 text-white"
-                                value={projectDescription}
-                                onChange={(e) => setProjectDescription(e.target.value)}
-                                placeholder="Describe your project (optional)"
-                                rows="3"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Team Members Section */}
-                    <div className="mb-8">
-                        <h2 className="text-xl font-semibold mb-4 border-b border-gray-700 pb-2 text-white">Team Members</h2>
-                        <p className="text-sm text-gray-400 mb-4">
-                            Add team members who will collaborate on this project. They will receive an email invitation
-                            with access to the online code editor.
-                        </p>
-
-                        {teamMembers.map((member, index) => (
-                            <div key={index} className="flex gap-3 mb-3">
-                                <div className="flex-1">
-                                    <input
-                                        type="email"
-                                        className="w-full p-3 border border-gray-700 rounded-md bg-gray-700 text-white"
-                                        value={member.email}
-                                        onChange={(e) => handleTeamMemberChange(index, "email", e.target.value)}
-                                        placeholder="Email address"
-                                    />
-                                </div>
-                                <div className="w-40">
-                                    <select
-                                        className="w-full p-3 border border-gray-700 rounded-md bg-gray-700 text-white"
-                                        value={member.role}
-                                        onChange={(e) => handleTeamMemberChange(index, "role", e.target.value)}
-                                    >
-                                        <option value="team_leader">Team Leader</option>
-                                        <option value="frontend_dev">Frontend Dev</option>
-                                        <option value="backend_dev">Backend Dev</option>
-                                        <option value="database_dev">Database Dev</option>
-                                        <option value="designer">Designer</option>
-                                    </select>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => handleRemoveTeamMember(index)}
-                                    className="p-3 border border-gray-700 rounded-md text-red-400 hover:bg-gray-700"
-                                    disabled={teamMembers.length === 1}
-                                >
-                                    ✕
-                                </button>
-                            </div>
-                        ))}
-
-                        <button
-                            type="button"
-                            onClick={handleAddTeamMember}
-                            className="mt-2 flex items-center text-purple-400 hover:text-purple-300"
-                        >
-                            <span className="mr-1">+</span> Add Another Team Member
-                        </button>
-                    </div>
-
-                    {/* GitHub Codespaces Integration Notice */}
-                    <div className="mb-8 bg-gray-900 p-4 rounded-md border border-gray-700">
-                        <h3 className="font-semibold mb-2 text-white">GitHub Codespaces Integration</h3>
-                        <p className="text-sm text-gray-400">
-                            Your project will be created as a GitHub repository and opened in GitHub Codespaces,
-                            providing a full VS Code experience in your browser. Team members will receive a link
-                            to join the same workspace.
-                        </p>
-                    </div>
-
-                    {/* Result Message */}
-                    {result.status && (
-                        <div className={`mb-6 p-4 rounded-md ${
-                            result.status === "success" ? "bg-green-900 text-green-300" :
-                            result.status === "error" ? "bg-red-900 text-red-300" :
-                            "bg-blue-900 text-blue-300"
-                        }`}>
-                            {result.status === "loading" && (
-                                <div className="flex items-center">
-                                    <div className="animate-spin mr-2 h-5 w-5 border-t-2 border-b-2 border-blue-300 rounded-full"></div>
-                                    {result.message}
-                                </div>
-                            )}
-                            {result.status !== "loading" && result.message}
-
-                            {result.status === "success" && result.repoUrl && (
-                                <div className="mt-3 flex gap-3">
-                                    <a
-                                        href={result.repoUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm underline text-purple-300"
-                                    >
-                                        View Repository
-                                    </a>
-                                    <a
-                                        href={result.codespaceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-sm underline text-purple-300"
-                                    >
-                                        Open in Codespaces
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Submit Button */}
-                    <div className="flex justify-center">
-                        <button
-                            type="submit"
-                            disabled={isCreating || !isProjectNameAvailable}
-                            className={`px-6 py-3 rounded-md text-white font-medium ${
-                                isCreating || !isProjectNameAvailable
-                                ? "bg-gray-600 cursor-not-allowed"
-                                : "bg-purple-600 hover:bg-purple-700"
-                            }`}
-                        >
-                            {isCreating ? "Creating Project..." : "Create Project & Open in Codespaces"}
-                        </button>
-                    </div>
-                </form>
-            </div>
+  return (
+    <div className="min-h-screen bg-gray-900 text-white px-6 py-8">
+      <div className="max-w-3xl mx-auto">
+        <div className="mb-8">
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="text-gray-400 hover:text-white flex items-center"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5 mr-1"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9.707 14.707a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 1.414L7.414 9H15a1 1 0 110 2H7.414l2.293 2.293a1 1 0 010 1.414z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Back to Dashboard
+          </button>
         </div>
-    );
+
+        <div className="bg-gray-800 rounded-xl p-8">
+          <h1 className="text-2xl font-bold mb-6">Create New Project</h1>
+
+          {error && (
+            <div className="bg-red-900/30 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-6">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div className="mb-6">
+              <label
+                htmlFor="projectName"
+                className="block text-gray-300 mb-2 font-medium"
+              >
+                Project Name*
+              </label>
+              <input
+                id="projectName"
+                type="text"
+                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="mb-6">
+              <label
+                htmlFor="description"
+                className="block text-gray-300 mb-2 font-medium"
+              >
+                Description
+              </label>
+              <textarea
+                id="description"
+                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white"
+                rows="3"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              ></textarea>
+            </div>
+
+            <div className="mb-6">
+              <label
+                htmlFor="techStack"
+                className="block text-gray-300 mb-2 font-medium"
+              >
+                Tech Stack*
+              </label>
+              <select
+                id="techStack"
+                className="w-full p-3 bg-gray-700 border border-gray-600 rounded-xl text-white"
+                value={techStack}
+                onChange={(e) => setTechStack(e.target.value)}
+                required
+              >
+                <option value="">Select a Tech Stack</option>
+                <option value="C/C++">C/C++</option>
+                <option value="Python with Django">Python with Django</option>
+                <option value="JAVA">JAVA</option>
+                <option value="HTML/CSS/JS">HTML/CSS/JS</option>
+                <option value="MERN">MERN</option>
+                <option value="MEAN">MEAN</option>
+                <option value=".NET">.NET</option>
+              </select>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-gray-300 font-medium">Team Members</label>
+                <button
+                  type="button"
+                  onClick={addMember}
+                  className="text-purple-400 hover:text-purple-300 text-sm"
+                >
+                  + Add Member
+                </button>
+              </div>
+
+              {members.map((member, index) => (
+                <div key={index} className="flex gap-4 mb-2">
+                  <input
+                    type="email"
+                    className="w-1/2 p-3 bg-gray-700 border border-gray-600 rounded-xl text-white"
+                    placeholder="Email"
+                    value={member.email}
+                    onChange={(e) =>
+                      handleMemberChange(index, "email", e.target.value)
+                    }
+                  />
+                  <select
+                    className="w-1/2 p-3 bg-gray-700 border border-gray-600 rounded-xl text-white"
+                    value={member.role}
+                    onChange={(e) =>
+                      handleMemberChange(index, "role", e.target.value)
+                    }
+                  >
+                    <option value="">Select Role</option>
+                    <option value="Frontend Developer">Frontend Developer</option>
+                    <option value="Friend">Friend</option>
+                    <option value="Backend Developer">Backend Developer</option>
+                    <option value="Full Stack Developer">
+                      Full Stack Developer
+                    </option>
+                  </select>
+                  {members.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeMember(index)}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-5 w-5"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-4 mt-8">
+              <button
+                type="button"
+                onClick={() => navigate("/dashboard")}
+                className="px-6 py-2 border border-gray-600 rounded-xl text-gray-300 hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 rounded-xl text-white font-medium disabled:opacity-50"
+              >
+                {loading ? "Creating..." : "Create Project"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default CreateProject;
