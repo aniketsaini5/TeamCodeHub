@@ -9,7 +9,8 @@ const projectSchema = new mongoose.Schema({
             email: { type: String, required: true },
             role: {
                 type: String,
-                enum: ['Frontend Developer', 'Backend Developer', 'Full Stack Developer'],
+                enum: ['Frontend Developer', 'Backend Developer', 'Full Stack Developer','Friend', 'Collaborator'],
+                default: 'Friend',
                 required: true
             },
         },

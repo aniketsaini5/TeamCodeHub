@@ -9,32 +9,31 @@ module.exports = (app) => {
     callbackURL: process.env.GITHUB_CALLBACK_URL,
     scope: ['user:email', 'repo']
   }, async (accessToken, refreshToken, profile, done) => {
-    // Log the profile and access token for debugging
-    console.log("GitHub Access Token:", accessToken);
-    console.log("GitHub Callback URL:", process.env.GITHUB_CALLBACK_URL);
-    console.log("GitHub Profile:", profile);
     try {
-      console.log("GitHub Access Token:", accessToken);
+      // Extract email and other profile details
+      const email = profile.emails?.[0]?.value || null; // Extract email safely
       const githubProfile = {
         githubId: profile.id,
         username: profile.username,
         displayName: profile.displayName || profile.username,
-        email: profile.emails?.[0]?.value || null, // Handle case where email is not provided,
+        email, // Use the extracted email directly
         avatarUrl: profile.photos?.[0]?.value,
         profileUrl: profile.profileUrl
       };
 
+      // Check if the user already exists
       let user = await User.findOne({ githubId: profile.id });
 
       if (user) {
-        // Update existing user's access token
+        // Update existing user's details
         user.accessToken = accessToken;
+        user.email = email; // Update email if it has changed
         user.lastLogin = new Date();
         await user.save();
         return done(null, user);
       }
 
-      // Create new user
+      // Create a new user if not found
       user = await User.create({
         ...githubProfile,
         accessToken,
@@ -49,11 +48,12 @@ module.exports = (app) => {
     }
   }));
 
-  // Serialize/deserialize
+  // Serialize user ID into the session
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
 
+  // Deserialize user from the session
   passport.deserializeUser(async (id, done) => {
     try {
       const user = await User.findById(id);
@@ -62,5 +62,4 @@ module.exports = (app) => {
       done(error, null);
     }
   });
-
 };

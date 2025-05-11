@@ -6,15 +6,15 @@ const router = express.Router();
 router.get('/github', (req, res, next) => {
     console.log("GitHub OAuth flow started"); // Log when the route is accessed
     next();
-  }, passport.authenticate('github', { scope: ['user:email', 'repo'] }));
+}, passport.authenticate('github', { scope: ['user:email', 'repo'] }));
 
 // GitHub OAuth callback route
 router.get(
-  '/github/callback',
-  passport.authenticate('github', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:5173' }),
-  (req, res) => {
-    res.redirect(`${process.env.CLIENT_URL}/dashboard`);
-  }
+    '/github/callback',
+    passport.authenticate('github', { failureRedirect: process.env.CLIENT_URL || 'http://localhost:5173' }),
+    (req, res) => {
+        res.redirect(`${process.env.CLIENT_URL}/dashboard`);
+    }
 );
 
 // router.get(
@@ -29,14 +29,14 @@ router.get(
 //     }
 // );
 // Logout Route
-router.post('/logout', (req, res) => {
-    req.logout(function (err) {
-      if (err) {
-        return res.status(500).json({ error: "Failed to logout" });
-      }
-      res.json({ success: true });
-    });
-  });
+// router.post('/logout', (req, res) => {
+//     req.logout(function (err) {
+//       if (err) {
+//         return res.status(500).json({ error: "Failed to logout" });
+//       }
+//       res.json({ success: true });
+//     });
+//   });
 
 
 //   router.post('/logout', (req, res) => {
@@ -49,5 +49,17 @@ router.post('/logout', (req, res) => {
 //     });
 // });
 
+
+router.post('/logout', (req, res) => {
+    console.log("Logout route hit"); // Debugging log
+    req.logout(function (err) {
+        if (err) {
+            console.error("Logout error:", err);
+            return res.status(500).json({ error: "Failed to logout" });
+        }
+        console.log("User logged out successfully"); // Debugging log
+        res.status(200).json({ message: "Logout successful" }); // Send JSON response
+    });
+});
 
 module.exports = router;

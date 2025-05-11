@@ -34,7 +34,7 @@ const io = socketIo(server, {
 
 // Middleware configuration
 app.use(cors({
-    origin: process.env.CLIENT_URL || 'http://localhost:5173', // Allow frontend origin
+    origin: 'http://localhost:5173', // Frontend URL
     credentials: true // Allow cookies and credentials
 }));
 app.use(bodyParser.json()); // Parse JSON request bodies

@@ -134,6 +134,8 @@ const CreateProjectModal = ({ onClose, onProjectCreated }) => {
                 <option value="Frontend Developer">Frontend Developer</option>
                 <option value="Backend Developer">Backend Developer</option>
                 <option value="Full Stack Developer">Full Stack Developer</option>
+                <option value="Collaborator">Collaborator</option>
+                <option value="Friend">Friend</option>
               </select>
               {members.length > 1 && (
                 <button
