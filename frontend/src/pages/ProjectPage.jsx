@@ -48,91 +48,202 @@ const ProjectPage = ({ user }) => {
     fetchProject()
   }, [projectId])
 
-  // Socket connection and event handling
+  const activeFileRef = useRef(activeFile);
+useEffect(() => {
+  activeFileRef.current = activeFile;
+}, [activeFile]);
+
+  
+  // // Socket connection and event handling
+  // useEffect(() => {
+  //   if (!socket || !projectId) return
+
+  //   // Assign a random color to the user if not already set
+  //   const userWithColor = {
+  //     ...user,
+  //     color: user.color || `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+  //   }
+
+  //   socket.emit("join project", {
+  //     projectId,
+  //     user: {
+  //       id: userWithColor.id,
+  //       name: userWithColor.name,
+  //       color: userWithColor.color,
+  //     },
+  //   })
+
+  //   socket.on("user joined", (users) => {
+  //     setConnectedUsers(users)
+  //     // Show notification when a new user joins
+  //     if (window.notifications && users.length > connectedUsers.length) {
+  //       const newUser = users.find((u) => !connectedUsers.some((cu) => cu.id === u.id))
+  //       if (newUser && newUser.id !== user.id) {
+  //         window.notifications.info(`${newUser.name} joined the project`)
+  //       }
+  //     }
+  //   })
+
+  //   socket.on("user left", (users) => {
+  //     // Find who left
+  //     if (window.notifications && users.length < connectedUsers.length) {
+  //       const leftUser = connectedUsers.find((u) => !users.some((nu) => nu.id === u.id))
+  //       if (leftUser && leftUser.id !== user.id) {
+  //         window.notifications.info(`${leftUser.name} left the project`)
+  //       }
+  //     }
+  //     setConnectedUsers(users)
+  //     // Remove their cursor
+  //     setOtherCursors((prev) => {
+  //       const newCursors = { ...prev }
+  //       connectedUsers.forEach((u) => {
+  //         if (!users.some((nu) => nu.id === u.id)) {
+  //           delete newCursors[u.id]
+  //         }
+  //       })
+  //       return newCursors
+  //     })
+  //   })
+
+  //   socket.on("code change", (data) => {
+  //     if (data.userId !== user.id) {
+  //       setFiles((prevFiles) =>
+  //         prevFiles.map((file) => (file.name === data.fileName ? { ...file, content: data.content } : file)),
+  //       )
+
+  //       // Update active file if it's the one being changed
+  //       if (activeFile?.name === data.fileName) {
+  //         setActiveFile((prev) => ({ ...prev, content: data.content }))
+  //       }
+  //     }
+  //   })
+
+  //   socket.on("cursor move", (data) => {
+  //     if (data.userId !== user.id && data.fileName === activeFile?.name) {
+  //       setOtherCursors((prev) => ({
+  //         ...prev,
+  //         [data.userId]: {
+  //           position: data.position,
+  //           color: data.color,
+  //           name: data.name,
+  //         },
+  //       }))
+  //     }
+  //   })
+
+  //     // Attach listeners
+  // socket.on("user joined", handleUserJoined);
+  // socket.on("user left", handleUserLeft);
+  // socket.on("code change", handleCodeChange);
+  // socket.on("cursor move", handleCursorMove);
+
+  //   return () => {
+  //   socket.emit("leave project", projectId);
+  //   socket.off("user joined", handleUserJoined);
+  //   socket.off("user left", handleUserLeft);
+  //   socket.off("code change", handleCodeChange);
+  //   socket.off("cursor move", handleCursorMove);
+  // };
+  //   }, [projectId, user]);
+  //   //CHECK KR 
+  // // }, [projectId, user, activeFile, connectedUsers])
+
   useEffect(() => {
-    if (!socket || !projectId) return
+  if (!socket || !projectId || !user) return;
 
-    // Assign a random color to the user if not already set
-    const userWithColor = {
-      ...user,
-      color: user.color || `#${Math.floor(Math.random() * 16777215).toString(16)}`,
-    }
+  // Assign a random color to the user if not already set
+  const userWithColor = {
+    ...user,
+    color: user.color || `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+  };
 
-    socket.emit("join project", {
-      projectId,
-      user: {
-        id: userWithColor.id,
-        name: userWithColor.name,
-        color: userWithColor.color,
-      },
-    })
+  socket.emit("join project", {
+    projectId,
+    user: {
+      id: userWithColor.id,
+      name: userWithColor.name,
+      color: userWithColor.color,
+    },
+  });
 
-    socket.on("user joined", (users) => {
-      setConnectedUsers(users)
-      // Show notification when a new user joins
-      if (window.notifications && users.length > connectedUsers.length) {
-        const newUser = users.find((u) => !connectedUsers.some((cu) => cu.id === u.id))
+  // Handler functions
+  const handleUserJoined = (users) => {
+    setConnectedUsers((prev) => {
+      // Only show notification if a new user joined
+      if (window.notifications && users.length > prev.length) {
+        const newUser = users.find((u) => !prev.some((cu) => cu.id === u.id));
         if (newUser && newUser.id !== user.id) {
-          window.notifications.info(`${newUser.name} joined the project`)
+          // window.notifications.info(`${newUser.name} joined the project`);
         }
       }
-    })
+      return users;
+    });
+  };
 
-    socket.on("user left", (users) => {
-      // Find who left
-      if (window.notifications && users.length < connectedUsers.length) {
-        const leftUser = connectedUsers.find((u) => !users.some((nu) => nu.id === u.id))
+  const handleUserLeft = (users) => {
+    setConnectedUsers((prev) => {
+      if (window.notifications && users.length < prev.length) {
+        const leftUser = prev.find((u) => !users.some((nu) => nu.id === u.id));
         if (leftUser && leftUser.id !== user.id) {
-          window.notifications.info(`${leftUser.name} left the project`)
+          // window.notifications.info(`${leftUser.name} left the project`);
         }
       }
-      setConnectedUsers(users)
       // Remove their cursor
-      setOtherCursors((prev) => {
-        const newCursors = { ...prev }
-        connectedUsers.forEach((u) => {
+      setOtherCursors((prevCursors) => {
+        const newCursors = { ...prevCursors };
+        prev.forEach((u) => {
           if (!users.some((nu) => nu.id === u.id)) {
-            delete newCursors[u.id]
+            delete newCursors[u.id];
           }
-        })
-        return newCursors
-      })
-    })
+        });
+        return newCursors;
+      });
+      return users;
+    });
+  };
 
-    socket.on("code change", (data) => {
-      if (data.userId !== user.id) {
-        setFiles((prevFiles) =>
-          prevFiles.map((file) => (file.name === data.fileName ? { ...file, content: data.content } : file)),
-        )
-
-        // Update active file if it's the one being changed
-        if (activeFile?.name === data.fileName) {
-          setActiveFile((prev) => ({ ...prev, content: data.content }))
-        }
-      }
-    })
-
-    socket.on("cursor move", (data) => {
-      if (data.userId !== user.id && data.fileName === activeFile?.name) {
-        setOtherCursors((prev) => ({
-          ...prev,
-          [data.userId]: {
-            position: data.position,
-            color: data.color,
-            name: data.name,
-          },
-        }))
-      }
-    })
-
-    return () => {
-      socket.emit("leave project", projectId)
-      socket.off("user joined")
-      socket.off("user left")
-      socket.off("code change")
-      socket.off("cursor move")
+ const handleCodeChange = (data) => {
+  if (data.userId !== user.id) {
+    setFiles((prevFiles) =>
+      prevFiles.map((file) =>
+        file.name === data.fileName ? { ...file, content: data.content } : file
+      )
+    );
+    if (activeFile?.name === data.fileName) {
+      setActiveFile((prev) => ({ ...prev, content: data.content }));
     }
-  }, [projectId, user, activeFile, connectedUsers])
+  }
+};
+
+  const handleCursorMove = (data) => {
+    if (data.userId !== user.id && data.fileName === activeFile?.name) {
+      setOtherCursors((prev) => ({
+        ...prev,
+        [data.userId]: {
+          position: data.position,
+          color: data.color,
+          name: data.name,
+        },
+      }));
+    }
+  };
+
+  // Attach listeners
+  socket.on("user joined", handleUserJoined);
+  socket.on("user left", handleUserLeft);
+  socket.on("code change", handleCodeChange);
+  socket.on("cursor move", handleCursorMove);
+
+  // Cleanup
+  return () => {
+    socket.emit("leave project", projectId);
+    socket.off("user joined", handleUserJoined);
+    socket.off("user left", handleUserLeft);
+    socket.off("code change", handleCodeChange);
+    socket.off("cursor move", handleCursorMove);
+  };
+  // Only depend on projectId and user!
+}, [projectId, user,activeFile]);
 
   // Share functionality
   const handleShare = async () => {
