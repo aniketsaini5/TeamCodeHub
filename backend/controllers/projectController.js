@@ -7,34 +7,80 @@ const os = require('os');
 // Create a new project
 exports.createProject = async (req, res) => {
   try {
-    const { name, description, techStack, teamMembers } = req.body;
-    
+    const { name, description, techStack, teamMembers } = req.body
+
     if (!name || !techStack) {
-      return res.status(400).json({ message: 'Project name and tech stack are required' });
+      return res.status(400).json({ message: "Project name and tech stack are required" })
     }
+
+    // Create initial file based on tech stack
+    let initialFile = {
+      name: "index.js",
+      content: '// Start coding here\nconsole.log("Hello, TeamCode Hub!");',
+      language: "javascript",
+    }
+
+    if (techStack.toLowerCase().includes("python")) {
+      initialFile = {
+        name: "main.py",
+        content: '# Start coding here\nprint("Hello, TeamCode Hub!")',
+        language: "python",
+      }
+    } else if (techStack.toLowerCase().includes("c++") || techStack.toLowerCase().includes("c/c++")) {
+      initialFile = {
+        name: "main.cpp",
+        content:
+          '#include <iostream>\n\nint main() {\n    std::cout << "Hello, TeamCode Hub!" << std::endl;\n    return 0;\n}',
+        language: "cpp",
+      }
+    } else if (techStack.toLowerCase().includes("java")) {
+      initialFile = {
+        name: "Main.java",
+        content:
+          'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello, TeamCode Hub!");\n    }\n}',
+        language: "java",
+      }
+    }
+
+    // Filter out empty email entries
+    const validTeamMembers = teamMembers
+      ? teamMembers.filter((member) => member.email && member.email.trim() !== "")
+      : []
 
     const project = new Project({
       name,
       description,
       techStack,
-      teamMembers: teamMembers || [],
+      teamMembers: [], // We'll add team members after sending invitations
       createdBy: req.user._id,
-      files: [
-        {
-          name: 'index.js',
-          content: '// Start coding here\nconsole.log("Hello, TeamCode Hub!");',
-          language: 'javascript'
-        }
-      ]
-    });
+      files: [initialFile],
+      invitationTokens: [],
+    })
 
-    await project.save();
-    res.status(201).json({ success: true, project });
+    // Save the project first to get an ID
+    await project.save()
+
+    // Send invitations to team members if there are any
+    let invitationResults = null
+    if (validTeamMembers.length > 0) {
+      invitationResults = await inviteController.sendMultipleInvitations(project._id, validTeamMembers, name)
+
+      // Add team members to the project
+      project.teamMembers = validTeamMembers
+      await project.save()
+    }
+
+    res.status(201).json({
+      success: true,
+      project,
+      invitations: invitationResults,
+    })
   } catch (err) {
-    console.error('Error creating project:', err);
-    res.status(500).json({ message: 'Server error', error: err.message });
+    console.error("Error creating project:", err)
+    res.status(500).json({ message: "Server error", error: err.message })
   }
-};
+}
+
 
 // Get all projects for the authenticated user
 exports.getProjects = async (req, res) => {
@@ -105,7 +151,7 @@ exports.updateFile = async (req, res) => {
 // Run code in a temporary environment
 exports.runCode = async (req, res) => {
   try {
-    const { code, language } = req.body;
+    const { code, language, input } = req.body;
     
     // Create a temporary directory
     const tempDir = path.join(os.tmpdir(), `teamcode-${Date.now()}`);
@@ -138,9 +184,19 @@ exports.runCode = async (req, res) => {
     // Write code to file
     const filePath = path.join(tempDir, fileName);
     fs.writeFileSync(filePath, code);
+
+    // Write input to a file if provided
+    const inputFile = path.join(tempDir, 'input.txt');
+    if (input) {
+      fs.writeFileSync(inputFile, input);
+    }
     
-    // Execute code
-    exec(`cd ${tempDir} && ${command} ${fileName}`, (error, stdout, stderr) => {
+    // Execute code with input redirection if available
+    const execCommand = input 
+      ? `cd ${tempDir} && ${command} ${fileName} < input.txt`
+      : `cd ${tempDir} && ${command} ${fileName}`;
+
+    exec(execCommand, (error, stdout, stderr) => {
       // Clean up temp directory
       fs.rmSync(tempDir, { recursive: true, force: true });
       

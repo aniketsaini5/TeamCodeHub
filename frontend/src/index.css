@@ -26,3 +26,22 @@ html {
     scroll-behavior: smooth;
     user-select: none;
 }
+/* Add these styles to your CSS file */
+.remote-cursor {
+  background-color: rgba(255, 0, 255, 0.5);
+  width: 2px !important;
+  height: 18px !important;
+}
+
+.remote-cursor-name {
+  position: absolute;
+  top: -20px;
+  padding: 2px 4px;
+  font-size: 10px;
+  color: white;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+

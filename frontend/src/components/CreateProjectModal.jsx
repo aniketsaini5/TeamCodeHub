@@ -104,7 +104,7 @@ const CreateProjectModal = ({ onClose, onProjectCreated }) => {
           >
             <option value="">Select a Tech Stack</option>
             <option value="C/C++">C/C++</option>
-            <option value="Python with Django">Python with Django</option>
+            <option value="Python with Django">Python </option>
             <option value="JAVA">JAVA</option>
             <option value="HTML/CSS/JS">HTML/CSS/JS</option>
             <option value="MERN">MERN</option>

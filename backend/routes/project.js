@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const projectController = require('../controllers/projectController');
+const terminalController = require('../controllers/terminalController');
 const isAuthenticated = require('../middleware/auth');
 
 // Middleware to ensure user is authenticated
@@ -20,5 +21,7 @@ router.post('/file', projectController.updateFile);
 
 // Run code
 router.post('/run', projectController.runCode);
+
+router.post('/execute', terminalController.executeTerminalCommand);
 
 module.exports = router;

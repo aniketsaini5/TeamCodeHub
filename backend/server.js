@@ -17,6 +17,9 @@ const githubRoutes = require('./routes/github');
 const chatRoutes = require('./routes/chat');
 const apiRoutes = require('./routes/api');
 
+
+const connectedUsers = new Map();
+
 // Initialize Express app
 const app = express();
 
@@ -73,30 +76,59 @@ require('./config/passport')(app);
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
 
-    // Join a project room
-    socket.on('join project', (projectId) => {
+    // User joins a project room
+    socket.on('join project', ({ projectId, user }) => {
         socket.join(projectId);
-        console.log(`User ${socket.id} joined project: ${projectId}`);
+
+        if (!connectedUsers.has(projectId)) {
+            connectedUsers.set(projectId, new Map());
+        }
+        connectedUsers.get(projectId).set(socket.id, user);
+
+        // Broadcast updated user list
+        const users = Array.from(connectedUsers.get(projectId).values());
+        io.to(projectId).emit('user joined', users);
+        console.log(`User ${user.name} joined project: ${projectId}`);
     });
 
-    // Handle chat messages
-    socket.on('chat message', (msg) => {
-        io.to(msg.projectId).emit('chat message', msg); // Broadcast message to project room
-        require('./controllers/chatController').saveMessageSocket(msg); // Save message to database
+    // User leaves a project room
+    socket.on('leave project', (projectId) => {
+        if (connectedUsers.has(projectId)) {
+            const users = connectedUsers.get(projectId);
+            users.delete(socket.id);
+
+            if (users.size === 0) {
+                connectedUsers.delete(projectId);
+            } else {
+                io.to(projectId).emit('user left', Array.from(users.values()));
+            }
+        }
+        socket.leave(projectId);
     });
 
-    // Handle code changes
+    // Broadcast code changes to other users in the project
     socket.on('code change', (data) => {
-        socket.to(data.projectId).emit('code change', data); // Broadcast code changes to project room
+        socket.to(data.projectId).emit('code change', data);
     });
 
-    // Handle cursor position
-    socket.on('cursor position', (data) => {
-        socket.to(data.projectId).emit('cursor position', data); // Broadcast cursor position to project room
+    // Broadcast cursor position (optional, for future use)
+    socket.on('cursor move', (data) => {
+        socket.to(data.projectId).emit('cursor move', data);
     });
 
-    // Handle user disconnection
+    // Handle disconnect
     socket.on('disconnect', () => {
+        for (const [projectId, users] of connectedUsers.entries()) {
+            if (users.has(socket.id)) {
+                users.delete(socket.id);
+                if (users.size === 0) {
+                    connectedUsers.delete(projectId);
+                } else {
+                    io.to(projectId).emit('user left', Array.from(users.values()));
+                }
+                break;
+            }
+        }
         console.log('User disconnected:', socket.id);
     });
 });
