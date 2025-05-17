@@ -20,21 +20,18 @@ const ChatPanel = ({ projectId, user, className }) => {
         setLoading(false);
       }
     };
-
     fetchMessages();
   }, [projectId]);
 
   // Listen for new messages
   useEffect(() => {
-    socket.on('chat message', (msg) => {
+    const handler = (msg) => {
       if (msg.projectId === projectId) {
-        setMessages((prevMessages) => [...prevMessages, msg]);
+        setMessages((prev) => [...prev, msg]);
       }
-    });
-
-    return () => {
-      socket.off('chat message');
     };
+    socket.on('chat message', handler);
+    return () => socket.off('chat message', handler);
   }, [projectId]);
 
   // Scroll to bottom when messages change
@@ -44,25 +41,19 @@ const ChatPanel = ({ projectId, user, className }) => {
 
   const sendMessage = (e) => {
     e.preventDefault();
-    
-    if (message.trim()) {
-      const newMessage = {
-        content: message,
-        sender: {
-          id: user.id,
-          username: user.username,
-          avatarUrl: user.avatar
-        },
-        projectId,
-        createdAt: new Date().toISOString()
-      };
-      
-      // Emit message to socket
-      socket.emit('chat message', newMessage);
-      
-      // Clear input
-      setMessage('');
-    }
+    if (!message.trim()) return;
+    const newMessage = {
+      content: message,
+      sender: {
+        id: user.id,
+        username: user.username || user.name,
+        avatarUrl: user.avatar || user.avatarUrl,
+      },
+      projectId,
+      createdAt: new Date().toISOString(),
+    };
+    socket.emit('chat message', newMessage);
+    setMessage('');
   };
 
   return (
@@ -70,7 +61,6 @@ const ChatPanel = ({ projectId, user, className }) => {
       <div className="p-3 border-b border-gray-700">
         <h2 className="text-lg font-semibold text-white">Team Chat</h2>
       </div>
-      
       <div className="flex-1 overflow-y-auto p-4">
         {loading ? (
           <div className="flex justify-center py-4">
@@ -81,9 +71,9 @@ const ChatPanel = ({ projectId, user, className }) => {
             <div key={index} className="mb-4">
               <div className="flex items-start">
                 {msg.sender.avatarUrl ? (
-                  <img 
-                    src={msg.sender.avatarUrl || "/placeholder.svg"} 
-                    alt={msg.sender.username} 
+                  <img
+                    src={msg.sender.avatarUrl}
+                    alt={msg.sender.username}
                     className="w-8 h-8 rounded-full mr-2"
                   />
                 ) : (
@@ -108,7 +98,6 @@ const ChatPanel = ({ projectId, user, className }) => {
         )}
         <div ref={messagesEndRef} />
       </div>
-      
       <form onSubmit={sendMessage} className="p-3 border-t border-gray-700">
         <div className="flex">
           <input

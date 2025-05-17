@@ -115,6 +115,13 @@ io.on('connection', (socket) => {
     socket.on('cursor move', (data) => {
         socket.to(data.projectId).emit('cursor move', data);
     });
+////////////////////////////////////////////////////////////////
+     socket.on('chat message', (msg) => {
+        // Optionally save to DB here
+        io.to(msg.projectId).emit('chat message', msg); // Broadcast to all in room
+    });
+
+    ////////////////////////////////////////////////////////////////////////////
 
     // Handle disconnect
     socket.on('disconnect', () => {
