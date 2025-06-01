@@ -24,4 +24,8 @@ router.post('/run', projectController.runCode);
 
 router.post('/execute', terminalController.executeTerminalCommand);
 
+router.delete('/:projectId/files/:fileName', projectController.deleteFile);
+
+router.put('/:projectId/files/:fileName/rename', projectController.renameFile);
+
 module.exports = router;

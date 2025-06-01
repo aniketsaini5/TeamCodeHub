@@ -172,6 +172,7 @@ exports.runCode = async (req, res) => {
         fileName = 'Main.java';
         command = 'javac Main.java && java Main';
         break;
+      case 'c++':
       case 'cpp':
         fileName = 'main.cpp';
         command = 'g++ main.cpp -o main && ./main';
@@ -209,5 +210,63 @@ exports.runCode = async (req, res) => {
   } catch (err) {
     console.error('Error running code:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+};
+
+
+exports.deleteFile = async (req, res) => {
+  try {
+    const { projectId, fileName } = req.params;
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const fileIndex = project.files.findIndex(file => file.name === fileName);
+    if (fileIndex === -1) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    project.files.splice(fileIndex, 1);
+    await project.save();
+
+    res.json({ success: true, message: "File deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting file:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+};
+
+exports.renameFile = async (req, res) => {
+  try {
+    const { projectId, fileName } = req.params;
+    const { newFileName } = req.body;
+
+    if (!newFileName) {
+      return res.status(400).json({ message: "New file name is required" });
+    }
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    const file = project.files.find((f) => f.name === fileName);
+    if (!file) {
+      return res.status(404).json({ message: "File not found" });
+    }
+
+    // Check for duplicate file name
+    if (project.files.some((f) => f.name === newFileName)) {
+      return res.status(400).json({ message: "A file with this name already exists" });
+    }
+
+    file.name = newFileName;
+    await project.save();
+
+    res.json({ success: true, file });
+  } catch (err) {
+    console.error("Error renaming file:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };

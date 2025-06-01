@@ -48,21 +48,177 @@ const FileIcon = ({ fileName }) => {
   return <span className={`mr-2 ${iconColor}`}>{icon}</span>
 }
 
-const FileExplorer = ({ files, activeFile, onFileSelect, onCreateFile }) => {
+const FileExplorer = ({ files, activeFile, onFileSelect, onCreateFile, onDeleteFile ,onRenameFile}) => {
   const [searchQuery, setSearchQuery] = useState("")
   const [showSearch, setShowSearch] = useState(false)
+  const [showModal, setShowModal] = useState(false)
+  const [newFileName, setNewFileName] = useState("")
+  const [fileToDelete, setFileToDelete] = useState(null)
+  const [fileToRename, setFileToRename] = useState(null)
+  const [renameFileName, setRenameFileName] = useState("")
 
   const filteredFiles = searchQuery
     ? files.filter((file) => file.name.toLowerCase().includes(searchQuery.toLowerCase()))
     : files
 
   const handleCreateFile = () => {
-    const fileName = prompt("Enter file name (with extension):")
-    if (fileName) onCreateFile(fileName)
+    setShowModal(true)
+    setNewFileName("")
+  }
+
+  const handleModalSubmit = (e) => {
+    e.preventDefault()
+    if (newFileName.trim()) {
+      onCreateFile(newFileName.trim())
+      setShowModal(false)
+      setNewFileName("")
+    }
+  }
+
+  const handleModalClose = () => {
+    setShowModal(false)
+    setNewFileName("")
+  }
+
+  const handleDeleteClick = (file) => {
+    setFileToDelete(file)
+  }
+
+  const confirmDelete = () => {
+    if (fileToDelete) {
+      onDeleteFile(fileToDelete)
+      setFileToDelete(null)
+    }
+  }
+
+  const cancelDelete = () => {
+    setFileToDelete(null)
+  }
+
+
+  // Handler to open rename modal
+  const handleRenameClick = (file) => {
+    setFileToRename(file)
+    setRenameFileName(file.name)
+  }
+
+  // Handler to confirm rename
+  const confirmRename = (e) => {
+    e.preventDefault()
+    if (fileToRename && renameFileName.trim() && renameFileName !== fileToRename.name) {
+      onRenameFile(fileToRename, renameFileName.trim())
+      setFileToRename(null)
+      setRenameFileName("")
+    }
+  }
+
+  // Handler to cancel rename
+  const cancelRename = () => {
+    setFileToRename(null)
+    setRenameFileName("")
   }
 
   return (
     <div className="w-48 bg-gray-800 border-r border-gray-700 overflow-y-auto flex flex-col">
+
+
+
+
+      {/* Modal for rename file */}
+      {fileToRename && (
+        <div className="fixed inset-0 flex rounded  items-center justify-center popup-bg z-50">
+          <form
+            onSubmit={confirmRename}
+            className="bg-gray-800 p-6 rounded shadow-lg flex flex-col gap-3 min-w-[300px]"
+          >
+            <label className="text-white font-semibold mb-1">
+              Rename file <span className="text-purple-400">{fileToRename.name}</span> to:
+            </label>
+            <input
+              type="text"
+              value={renameFileName}
+              onChange={(e) => setRenameFileName(e.target.value)}
+              className="px-3 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={cancelRename}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal for new file */}
+      {showModal && (
+        <div className="fixed inset-0 flex rounded  items-center justify-center popup-bg z-50">
+          <form
+            onSubmit={handleModalSubmit}
+            className="bg-gray-800 p-6 rounded shadow-lg flex flex-col gap-3 min-w-[300px]"
+          >
+            <label className="text-white font-semibold mb-1">Enter file name (with extension):</label>
+            <input
+              type="text"
+              value={newFileName}
+              onChange={(e) => setNewFileName(e.target.value)}
+              className="px-3 py-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none"
+              autoFocus
+            />
+            <div className="flex gap-2 mt-2">
+              <button
+                type="submit"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+              >
+                Create
+              </button>
+              <button
+                type="button"
+                onClick={handleModalClose}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal for delete confirmation */}
+      {fileToDelete && (
+        <div className="fixed inset-0 flex  rounded  items-center justify-center popup-bg z-50">
+          <div className="bg-gray-800 p-6 rounded shadow-lg flex flex-col gap-3 min-w-[300px]">
+            <div className="text-white font-semibold mb-2">
+              Delete file <span className="text-red-400">{fileToDelete.name}</span>?
+            </div>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+              >
+                Delete
+              </button>
+              <button
+                onClick={cancelDelete}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 flex-shrink-0">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-sm font-semibold text-gray-400">FILES</h2>
@@ -110,15 +266,39 @@ const FileExplorer = ({ files, activeFile, onFileSelect, onCreateFile }) => {
           {filteredFiles.map((file) => (
             <li
               key={file.name}
-              onClick={() => onFileSelect(file)}
-              className={`px-2 py-1 rounded text-sm cursor-pointer flex items-center ${
-                activeFile?.name === file.name
+              className={`px-2 py-1 rounded text-sm flex items-center justify-between group ${activeFile?.name === file.name
                   ? "bg-gray-700 text-white"
                   : "text-gray-400 hover:bg-gray-700 hover:text-white"
-              }`}
+                }`}
             >
-              <FileIcon fileName={file.name} />
-              <span className="truncate">{file.name}</span>
+              <div
+                className="flex items-center flex-1 cursor-pointer"
+                onClick={() => onFileSelect(file)}
+              >
+                <FileIcon fileName={file.name} />
+                <span className="truncate">{file.name}</span>
+              </div>
+
+              <div className="flex items-center">
+                <button
+                  onClick={() => handleRenameClick(file)}
+                  className="ml-2 text-yellow-400 hover:text-yellow-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Rename file"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => handleDeleteClick(file)}
+                  className="ml-2 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete file"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </li>
           ))}
 

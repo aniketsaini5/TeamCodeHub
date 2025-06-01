@@ -1,9 +1,25 @@
-const executePython = async (command, input, currentFile) => {
+const { exec } = require('child_process');
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
+const Project = require('../models/Project');
+
+const executeCommand = async (command) => {
+    return new Promise((resolve, reject) => {
+        exec(command, (error, stdout, stderr) => {
+            if (error) reject(stderr || error.message);
+            resolve(stdout);
+        });
+    });
+};
+
+const executePython = async (command, input, fileContent, fileName) => {
     const tempDir = path.join(os.tmpdir(), `terminal-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
-    // Copy the current file to temp directory
-    fs.copyFileSync(currentFile, path.join(tempDir, path.basename(currentFile)));
+    // Write the file content to temp directory
+    const filePath = path.join(tempDir, fileName);
+    fs.writeFileSync(filePath, fileContent);
 
     if (input) {
         fs.writeFileSync(path.join(tempDir, 'input.txt'), input);
@@ -11,10 +27,10 @@ const executePython = async (command, input, currentFile) => {
 
     return new Promise((resolve, reject) => {
         const cmd = input 
-            ? `cd ${tempDir} && python ${path.basename(currentFile)} < input.txt`
-            : `cd ${tempDir} && python ${path.basename(currentFile)}`;
+            ? `python ${fileName} < input.txt`
+            : `python ${fileName}`;
         
-        exec(cmd, (error, stdout, stderr) => {
+        exec(cmd, { cwd: tempDir }, (error, stdout, stderr) => {
             fs.rmSync(tempDir, { recursive: true, force: true });
             if (error) reject(stderr || error.message);
             resolve(stdout);
@@ -22,76 +38,117 @@ const executePython = async (command, input, currentFile) => {
     });
 };
 
-const executeCpp = async (command, input, currentFile) => {
+const executeCpp = async (command, input, fileContent, fileName) => {
     const tempDir = path.join(os.tmpdir(), `terminal-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
-    // Copy the current file to temp directory
-    fs.copyFileSync(currentFile, path.join(tempDir, path.basename(currentFile)));
+    // Write the file content to temp directory
+    const filePath = path.join(tempDir, fileName);
+    fs.writeFileSync(filePath, fileContent);
 
     if (input) {
         fs.writeFileSync(path.join(tempDir, 'input.txt'), input);
     }
 
     return new Promise((resolve, reject) => {
-        // For Windows, use different commands
-        const compileCmd = process.platform === 'win32' 
-            ? `cd ${tempDir} && g++ ${path.basename(currentFile)} -o program.exe`
-            : `cd ${tempDir} && g++ ${path.basename(currentFile)} -o program`;
+        const isWindows = process.platform === 'win32';
+        const outputName = path.parse(fileName).name; // Get filename without extension
+        const exeName = isWindows ? `${outputName}.exe` : outputName;
         
-        const runCmd = process.platform === 'win32'
-            ? input ? `program.exe < input.txt` : `program.exe`
-            : input ? `./program < input.txt` : `./program`;
+        // Compile command with proper quoting
+        const compileCmd = `g++ "${fileName}" -o "${exeName}"`;
+        
+        // Run command with proper Windows/Unix handling
+        const runCmd = isWindows 
+            ? input 
+                ? `cmd.exe /c "${exeName}" < input.txt` 
+                : `cmd.exe /c "${exeName}"`
+            : input 
+                ? `./${exeName} < input.txt` 
+                : `./${exeName}`;
 
-        exec(`${compileCmd} && ${runCmd}`, { cwd: tempDir }, (error, stdout, stderr) => {
-            fs.rmSync(tempDir, { recursive: true, force: true });
-            if (error) reject(stderr || error.message);
-            resolve(stdout);
+        // First compile
+        exec(compileCmd, { cwd: tempDir }, (compileError, compileStdout, compileStderr) => {
+            if (compileError) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                return reject(compileStderr || compileError.message);
+            }
+            
+            // Then run if compilation succeeded
+            exec(runCmd, { cwd: tempDir }, (runError, runStdout, runStderr) => {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                if (runError) {
+                    reject(runStderr || runError.message);
+                } else {
+                    resolve(runStdout);
+                }
+            });
         });
     });
 };
 
-const executeJava = async (command, input, currentFile) => {
+const executeJava = async (command, input, fileContent, fileName) => {
     const tempDir = path.join(os.tmpdir(), `terminal-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
 
-    // Copy the current file to temp directory
-    fs.copyFileSync(currentFile, path.join(tempDir, path.basename(currentFile)));
+    // Write the file content to temp directory
+    const filePath = path.join(tempDir, fileName);
+    fs.writeFileSync(filePath, fileContent);
 
     if (input) {
         fs.writeFileSync(path.join(tempDir, 'input.txt'), input);
     }
 
     return new Promise((resolve, reject) => {
-        const className = path.basename(currentFile, '.java');
-        const compileCmd = `cd ${tempDir} && javac ${path.basename(currentFile)}`;
+        const className = path.basename(fileName, '.java');
+        const compileCmd = `javac ${fileName}`;
         const runCmd = input 
-            ? `cd ${tempDir} && java ${className} < input.txt`
-            : `cd ${tempDir} && java ${className}`;
+            ? `java ${className} < input.txt`
+            : `java ${className}`;
 
-        exec(`${compileCmd} && ${runCmd}`, (error, stdout, stderr) => {
-            fs.rmSync(tempDir, { recursive: true, force: true });
-            if (error) reject(stderr || error.message);
-            resolve(stdout);
+        exec(compileCmd, { cwd: tempDir }, (compileError, compileStdout, compileStderr) => {
+            if (compileError) {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                return reject(compileStderr || compileError.message);
+            }
+            
+            exec(runCmd, { cwd: tempDir }, (runError, runStdout, runStderr) => {
+                fs.rmSync(tempDir, { recursive: true, force: true });
+                if (runError) {
+                    reject(runStderr || runError.message);
+                } else {
+                    resolve(runStdout);
+                }
+            });
         });
     });
 };
 
-// Update the main execution function
 exports.executeTerminalCommand = async (req, res) => {
     const { command, language, projectId, currentFile, input } = req.body;
 
     try {
+        // Get the project and file content
+        const project = await Project.findById(projectId);
+        if (!project) {
+            return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const file = project.files.find(f => f.name === currentFile);
+        if (!file) {
+            return res.status(404).json({ error: 'File not found' });
+        }
+
         let output;
         switch (language) {
             case 'python':
-                output = await executePython(command, input, currentFile);
+                output = await executePython(command, input, file.content, file.name);
                 break;
             case 'cpp':
-                output = await executeCpp(command, input, currentFile);
+                output = await executeCpp(command, input, file.content, file.name);
                 break;
             case 'java':
-                output = await executeJava(command, input, currentFile);
+                output = await executeJava(command, input, file.content, file.name);
                 break;
             default:
                 output = await executeCommand(command);
@@ -100,7 +157,7 @@ exports.executeTerminalCommand = async (req, res) => {
         res.json({ output });
     } catch (error) {
         res.status(500).json({ 
-            error: error.message,
+            error: error.message || 'Execution failed',
             details: error.stderr || error.stdout || 'No additional details available'
         });
     }

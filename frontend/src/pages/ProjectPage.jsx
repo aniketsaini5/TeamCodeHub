@@ -314,10 +314,11 @@ useEffect(() => {
           '# Python code here\n\ndef main():\n    print("Hello World!")\n\nif __name__ == "__main__":\n    main()'
         language = "python"
         break
-      case "cpp":
+        case "cpp":
+        case "c++":
         defaultContent =
-          '#include <iostream>\n\nint main() {\n    std::cout << "Hello World!" << std::endl;\n    return 0;\n}'
-        language = "cpp"
+          '#include <iostream>\n using namespace std;\nint main() {\n    cout << "Hello World!" << endl;\n    return 0;\n}'
+        language = "cpp" 
         break
       case "java":
         defaultContent =
@@ -325,7 +326,7 @@ useEffect(() => {
         language = "java"
         break
       default:
-        defaultContent = "// Code here"
+        defaultContent = "// Code here \nconsole.log('Hello Teamcoder!');"
         language = "javascript"
     }
 
@@ -357,6 +358,66 @@ useEffect(() => {
     }
   }
 
+ /////////////////////////////////////////new feature added to delete file
+
+const handleRenameFile = async (oldFile, newFileName) => {
+  try {
+    await axios.put(`/api/projects/${projectId}/files/${oldFile.name}/rename`, {
+      newFileName,
+    });
+    // Update files state
+    setFiles((prevFiles) =>
+      prevFiles.map((file) =>
+        file.name === oldFile.name ? { ...file, name: newFileName } : file
+      )
+    );
+    // Update activeFile if it was renamed
+    if (activeFile?.name === oldFile.name) {
+      setActiveFile((prev) => ({ ...prev, name: newFileName }));
+    }
+    if (window.notifications) {
+      window.notifications.success(`File renamed to ${newFileName}`);
+    }
+  } catch (err) {
+    if (window.notifications) {
+      window.notifications.error("Failed to rename file.");
+    }
+  }
+};
+
+
+ const handleDeleteFile = async (fileToDelete) => {
+  try {
+    // Call your API to delete the file from the backend
+    await axios.delete(`/api/projects/${projectId}/files/${fileToDelete.name}`)
+    
+    // Remove file from the files array
+    setFiles((prevFiles) => prevFiles.filter((file) => file.name !== fileToDelete.name))
+    
+    // If the deleted file was the active file, switch to another file or set to null
+    if (activeFile?.name === fileToDelete.name) {
+      const remainingFiles = files.filter((file) => file.name !== fileToDelete.name)
+      if (remainingFiles.length > 0) {
+        setActiveFile(remainingFiles[0])
+      } else {
+        setActiveFile(null)
+      }
+    }
+    
+    // Show success notification
+    if (window.notifications) {
+      window.notifications.success(`File ${fileToDelete.name} deleted successfully.`)
+    }
+  } catch (err) {
+    console.error("Error deleting file:", err)
+    setError("Failed to delete file. Please try again.")
+    if (window.notifications) {
+      window.notifications.error("Failed to delete file. Please try again.")
+    }
+  }
+}
+
+
   const handleSaveFile = async () => {
     if (!activeFile) return
 
@@ -380,10 +441,11 @@ useEffect(() => {
   const handleTerminalCommand = async (command) => {
     try {
       const extension = activeFile?.name.split(".").pop().toLowerCase()
+      
       const res = await axios.post("/api/projects/execute", {
         command,
         projectId,
-        language: extension,
+        language,
         currentFile: activeFile?.name,
         input: command,
       })
@@ -460,6 +522,8 @@ useEffect(() => {
           activeFile={activeFile}
           onFileSelect={handleFileSelect}
           onCreateFile={handleCreateFile}
+          onDeleteFile={handleDeleteFile}  
+          onRenameFile={handleRenameFile} 
         />
 
         {/* Editor and Terminal */}

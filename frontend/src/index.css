@@ -44,4 +44,6 @@ html {
   pointer-events: none;
 }
 
-
+.popup-bg{
+          background-color: rgba(0, 0, 0, 0.6) !important;
+        }
