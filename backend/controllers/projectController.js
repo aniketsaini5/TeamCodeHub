@@ -88,7 +88,7 @@ exports.getProjects = async (req, res) => {
     const projects = await Project.find({ createdBy: req.user._id })
       .select('name description techStack teamMembers createdAt')
       .sort({ createdAt: -1 });
-    
+
     res.json({ projects });
   } catch (err) {
     console.error('Error fetching projects:', err);
@@ -100,11 +100,11 @@ exports.getProjects = async (req, res) => {
 exports.getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id);
-    
+
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    
+
     res.json({ project });
   } catch (err) {
     console.error('Error fetching project:', err);
@@ -116,16 +116,16 @@ exports.getProjectById = async (req, res) => {
 exports.updateFile = async (req, res) => {
   try {
     const { projectId, fileName, content } = req.body;
-    
+
     const project = await Project.findById(projectId);
-    
+
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    
+
     // Find the file in the project
     const fileIndex = project.files.findIndex(file => file.name === fileName);
-    
+
     if (fileIndex === -1) {
       // File doesn't exist, create it
       project.files.push({
@@ -139,7 +139,7 @@ exports.updateFile = async (req, res) => {
       project.files[fileIndex].content = content;
       project.files[fileIndex].lastUpdated = new Date();
     }
-    
+
     await project.save();
     res.json({ success: true, message: 'File updated successfully' });
   } catch (err) {
@@ -152,13 +152,13 @@ exports.updateFile = async (req, res) => {
 exports.runCode = async (req, res) => {
   try {
     const { code, language, input } = req.body;
-    
+
     // Create a temporary directory
     const tempDir = path.join(os.tmpdir(), `teamcode-${Date.now()}`);
     fs.mkdirSync(tempDir, { recursive: true });
-    
+
     let fileName, command;
-    
+
     switch (language) {
       case 'javascript':
         fileName = 'index.js';
@@ -175,13 +175,18 @@ exports.runCode = async (req, res) => {
       case 'c++':
       case 'cpp':
         fileName = 'main.cpp';
-        command = 'g++ main.cpp -o main && ./main';
+        // Detect platform and set command accordingly
+        if (process.platform === 'win32') {
+          command = 'g++ main.cpp -o main.exe && main.exe';
+        } else {
+          command = 'g++ main.cpp -o main && ./main';
+        }
         break;
       default:
         fileName = 'index.js';
         command = 'node';
     }
-    
+
     // Write code to file
     const filePath = path.join(tempDir, fileName);
     fs.writeFileSync(filePath, code);
@@ -191,20 +196,20 @@ exports.runCode = async (req, res) => {
     if (input) {
       fs.writeFileSync(inputFile, input);
     }
-    
+
     // Execute code with input redirection if available
-    const execCommand = input 
+    const execCommand = input
       ? `cd ${tempDir} && ${command} ${fileName} < input.txt`
       : `cd ${tempDir} && ${command} ${fileName}`;
 
     exec(execCommand, (error, stdout, stderr) => {
       // Clean up temp directory
       fs.rmSync(tempDir, { recursive: true, force: true });
-      
+
       if (error) {
         return res.json({ output: stderr || error.message, error: true });
       }
-      
+
       res.json({ output: stdout, error: false });
     });
   } catch (err) {
